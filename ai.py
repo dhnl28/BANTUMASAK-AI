@@ -90,9 +90,10 @@ if st.button("Cari Resep, Gas!"):
         # Tampilkan hasilnya
         st.markdown("---")
         st.header("✅ Hasil Resep Rekomendasi:")
-        st.markdown(resep_final)
+        st.code(resep_final)
         st.markdown("---")
         st.success("Selamat mencoba, Bro! Jangan lupa bagi-bagi masakannya.")
 
     else:
+
         st.warning("Jangan kosong, Bro! Isi dulu bahannya!")
