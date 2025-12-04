@@ -34,7 +34,6 @@ if "messages" not in st.session_state:
 if "chat" not in st.session_state:
 
     # === SYSTEM INSTRUCTION (SINGLE SOURCE OF TRUTH UNTUK DIVERSIFIKASI) ===
-    # Instruksi ini kita berikan di history chat untuk menghindari error 'system_instruction'
     system_instruction = (
         "Anda adalah Asisten Masak AI yang sangat kreatif, berfokus pada masakan rumahan "
         "Indonesia dari berbagai daerah. Dalam setiap respons, Anda **wajib** memberikan "
@@ -48,7 +47,6 @@ if "chat" not in st.session_state:
 
     try:
         # 1. Siapkan pesan inisial yang berisi instruksi sistem dan respons AI pertama
-        # Perhatikan: Ini adalah cara yang benar untuk memberikan System Instruction ke Chat API
         initial_history = [
             {"role": "user", "parts": [{"text": system_instruction}]},
             {"role": "model", "parts": [
@@ -72,9 +70,56 @@ if "chat" not in st.session_state:
 # --- BAGIAN 3: MENAMPILKAN RIWAYAT CHAT ---
 
 # Tampilkan semua riwayat chat yang sudah disimpan
-# --- BAGIAN 3: MENAMPILKAN RIWAYAT CHAT ---
-
-# Tampilkan semua riwayat chat yang sudah disimpan
 for message in st.session_state.messages:
     with st.chat_message(message["role"]):
-        st.markdown(message["content"]) # <-- INI PERBAIKANNYA!
+        st.markdown(message["content"])
+
+# --- BAGIAN 4: INPUT USER DAN PENGIRIMAN PROMPT (FINAL FIX) ---
+
+# Input teks klasik (Lebih stabil dan kompatibel dengan browser lama)
+prompt_input = st.text_input(
+    "Masukkan bahan atau instruksi lanjutan (Contoh: 'Bayam, Jagung') atau ('Ganti yang lebih pedas')",
+    key="user_input_key"
+)
+
+# Tombol untuk mengirim prompt
+if st.button("Kirim Prompt"):
+    
+    # Ambil teks dari input
+    prompt = prompt_input
+    
+    if prompt:
+        
+        # 1. Tampilkan prompt user di UI
+        with st.chat_message("user"):
+            st.markdown(prompt)
+
+        # 2. Tambahkan prompt user ke riwayat chat
+        st.session_state.messages.append({"role": "user", "content": prompt})
+
+        # 3. Kirim pesan ke Gemini dan dapatkan respons
+        try:
+            # Gunakan send_message() untuk chat berkelanjutan
+            response = st.session_state.chat.send_message(prompt)
+
+            # 4. Tampilkan respons Gemini di UI
+            with st.chat_message("assistant"):
+                st.markdown(response.text)
+
+            # 5. Tambahkan respons Gemini ke riwayat chat
+            st.session_state.messages.append(
+                {"role": "assistant", "content": response.text})
+
+            # Kosongkan input setelah dikirim
+            st.session_state.user_input_key = "" # Reset teks input
+
+        except APIError as e:
+            with st.chat_message("assistant"):
+                st.error(f"🚨 API Error: Terjadi masalah saat menghubungi Gemini. ({e})")
+        except Exception as e:
+            with st.chat_message("assistant"):
+                st.error(f"🚨 Error: Terjadi kesalahan tak terduga: {e}")
+    else:
+        st.warning("Input tidak boleh kosong!")
+
+# --- END OF CODE ---
