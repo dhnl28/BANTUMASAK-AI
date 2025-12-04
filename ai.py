@@ -90,7 +90,7 @@ bahan_user = st.text_area(
 )
 
 # Tombol untuk eksekusi
-if st.button("Cari Resep, Gas!"):
+if st.button("Cari Resep, Gas!") or 'rerun' in st.session_state:
     if bahan_user:
         # Tampilkan status loading saat AI bekerja
         with st.spinner('AI sedang meramu resep... 🧠'):
@@ -100,11 +100,18 @@ if st.button("Cari Resep, Gas!"):
         # Tampilkan hasilnya
         st.markdown("---")
         st.header("✅ Hasil Resep Rekomendasi:")
-        st.code(resep_final)
+        st.markdown(resep_final)
         st.markdown("---")
         st.success("Selamat mencoba, Bro! Jangan lupa bagi-bagi masakannya.")
-
+        
+        # === LOGIKA INTERAKTIF BARU ===
+        st.write("Belum sreg sama resepnya?")
+        
+        # Tombol untuk meminta resep baru
+        if st.button("Minta Ide Resep Lain"):
+            # Kita set 'rerun' ke True dan jalankan ulang
+            st.session_state['rerun'] = True 
+            st.rerun() # Perintah Streamlit untuk menjalankan ulang script
+            
     else:
-
         st.warning("Jangan kosong, Bro! Isi dulu bahannya!")
-
