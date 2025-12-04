@@ -72,6 +72,9 @@ if "chat" not in st.session_state:
 # --- BAGIAN 3: MENAMPILKAN RIWAYAT CHAT ---
 
 # Tampilkan semua riwayat chat yang sudah disimpan
+# --- BAGIAN 3: MENAMPILKAN RIWAYAT CHAT ---
+
+# Tampilkan semua riwayat chat yang sudah disimpan
 for message in st.session_state.messages:
     with st.chat_message(message["role"]):
-        st.markdown(message
+        st.markdown(message["content"]) # <-- INI PERBAIKANNYA!
