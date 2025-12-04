@@ -2,17 +2,14 @@ import streamlit as st
 from google import genai
 from google.genai.errors import APIError
 
-# --- BAGIAN 1: KONFIGURASI DAN INICIALISASI (SUDAH DIUBAH) ---
+# --- BAGIAN 1: KONFIGURASI DAN INICIALISASI ---
 
-# 1. Ambil API Key dari Streamlit Secrets
-# Kita minta Streamlit cari variabel GEMINI_API_KEY di file secrets.toml
+# Ambil API Key dari Streamlit Secrets (Key harus ditaruh di .streamlit/secrets.toml)
 try:
     api_key = st.secrets["GEMINI_API_KEY"]
 except KeyError:
-    # Kalo key gak ketemu di secrets.toml
     st.error("⚠️ Bro, API Key lo belum diset di file .streamlit/secrets.toml!")
-    st.error("Tolong buat file itu dan isi GEMINI_API_KEY = \"KEY_LO\" ")
-    st.stop() # Hentikan aplikasi
+    st.stop()
 
 # Inisialisasi klien Gemini
 try:
@@ -21,97 +18,60 @@ except Exception as e:
     st.error(f"Gagal koneksi ke Gemini API: {e}")
     st.stop()
 
-# --- BAGIAN 2: FUNGSI UTAMA (OTAK AI) ---
+# Set model yang akan digunakan
+MODEL = "gemini-2.5-flash"
 
-def generate_recipe(bahan_input):
-    """
-    Fungsi ini yang akan kontak ke Gemini dan meminta resep.
-    """
-    # Prompt Engineering: Kunci sukses AI ada di sini!
-    # ... di dalam fungsi generate_recipe(bahan_input) ...
+# --- BAGIAN 2: SETUP STREAMLIT CHAT UI dan DIVERSIFIKASI ---
 
-    # Prompt Engineering Baru: Lebih ketat, minta variasi, dan inovasi!
-    prompt_saya = f"""
-    Anda adalah asisten masak profesional yang berfokus pada masakan rumahan Indonesia.
-    Tugas Anda adalah membuat 1 (satu) rekomendasi resep masakan Indonesia yang **kreatif, tidak umum, dan variatif**.
-    Gunakan bahan-bahan utama berikut: **{bahan_input}**.
-    
-    Persyaratan Ekstra:
-    1. Hindari resep yang sangat umum (misal: hanya Tumis Kangkung, Dadar Telur, atau Sayur Bening).
-    2. Resep harus praktis dan menggunakan bumbu yang umum ada di dapur Indonesia.
-    3. Jika memungkinkan, berikan rekomendasi dari **masakan daerah yang berbeda** (Sumatera, Jawa, Sulawesi, dll.).
-    
-    Format Jawaban (Wajib):
-    
-    ## 🍲 Nama Masakan: [NAMA RESEP YANG ENAK DAN UNIK]
-    
-    ### 🛒 Bahan yang Diperlukan (Di luar Bahan Utama):
-    * [List bahan tambahan, misal: Cabai, Santan, Minyak, dll]
-    
-    ### 👨‍🍳 Langkah Memasak:
-    1. [Langkah 1]
-    2. [Langkah 2]
-    3. [Langkah 3, dst]
-    
-    ---
-    
-    **💡 Opsi Lain:** Jika resep di atas kurang sreg, Anda bisa mencoba resep berikut: [Sebutkan 1-2 ide nama masakan lain, tanpa detail resep].
-    
-    Selamat bekerja!
-    """
-    
-    # ... sisa fungsi tetap sama ...
-    
-    # Panggil model Gemini (kita pakai gemini-2.5-flash karena cepat dan pintar)
+st.title("👨‍🍳 Tukang Sayur AI Chat: Resep Interaktif")
+st.caption("Masukin bahan lo, lalu lo bisa minta menu lain, ganti rasa, atau tambah bahan!")
+
+# Inisialisasi Riwayat Chat di Session State
+if "messages" not in st.session_state:
+    st.session_state["messages"] = []
+
+# Inisialisasi Chat Session Gemini (Kunci Interaktivitas)
+if "chat" not in st.session_state:
+
+    # === SYSTEM INSTRUCTION (SINGLE SOURCE OF TRUTH UNTUK DIVERSIFIKASI) ===
+    # Instruksi ini kita berikan di history chat untuk menghindari error 'system_instruction'
+    system_instruction = (
+        "Anda adalah Asisten Masak AI yang sangat kreatif, berfokus pada masakan rumahan "
+        "Indonesia dari berbagai daerah. Dalam setiap respons, Anda **wajib** memberikan "
+        "resep yang variatif dan tidak monoton. Respon pertama Anda harus meminta daftar bahan. "
+        "Setelah user memberikan daftar bahan, berikan 1 rekomendasi resep dalam format Markdown rapi."
+        "Jika user memberikan instruksi lanjutan (misal: 'ganti', 'pedas', 'tambah'), "
+        "Anda harus merespon dengan rekomendasi resep baru, tanpa mengulang resep sebelumnya, "
+        "dan tetap menggunakan bahan utama dari pesan pertama user."
+    )
+    # =======================================================
+
     try:
-        response = client.models.generate_content(
-            model="gemini-2.5-flash",
-            contents=prompt_saya
+        # 1. Siapkan pesan inisial yang berisi instruksi sistem dan respons AI pertama
+        # Perhatikan: Ini adalah cara yang benar untuk memberikan System Instruction ke Chat API
+        initial_history = [
+            {"role": "user", "parts": [{"text": system_instruction}]},
+            {"role": "model", "parts": [
+                {"text": "Halo Bro! Saya Asisten Masak lo. Bahan-bahan apa aja yang lo punya sekarang? Sebutin aja semua!"}]},
+        ]
+
+        # 2. Kita buat chat session menggunakan history yang sudah ada
+        st.session_state["chat"] = client.chats.create(
+            model=MODEL,
+            history=initial_history  # Gunakan history untuk system instruction
         )
-        return response.text
-        
-    except APIError as e:
-        return f"🚨 API Error: Terjadi masalah saat menghubungi Gemini. ({e})"
+
+        # 3. Tambahkan pesan pertama AI ke riwayat chat UI (agar langsung muncul di layar)
+        st.session_state.messages.append(
+            {"role": "assistant", "content": initial_history[1]['parts'][0]['text']})
+
     except Exception as e:
-        return f"🚨 Error: Terjadi kesalahan tak terduga: {e}"
+        st.error(f"Gagal membuat sesi chat Gemini: {e}")
+        st.stop()
 
-# --- BAGIAN 3: INTERFACE STREAMLIT (TAMPILAN) ---
+# --- BAGIAN 3: MENAMPILKAN RIWAYAT CHAT ---
 
-# Atur tampilan judul dan deskripsi aplikasi
-st.title("👨‍🍳 Tukang Sayur AI: Rekomendasi Resep Kilat")
-st.caption("Dibangun menggunakan Python, Streamlit, dan Google Gemini API.")
-st.write("Bro, masukin bahan-bahan yang lo punya sekarang, nanti gue cariin resep masakan Indonesia yang cocok!")
-
-# Input area untuk bahan-bahan
-bahan_user = st.text_area(
-    "Contoh: Bayam, Jagung Manis, Kemiri, Bawang Merah",
-    height=150,
-    placeholder="Coba ketik bahan yang lo beli di tukang sayur..."
-)
-
-# Tombol untuk eksekusi
-if st.button("Cari Resep, Gas!") or 'rerun' in st.session_state:
-    if bahan_user:
-        # Tampilkan status loading saat AI bekerja
-        with st.spinner('AI sedang meramu resep... 🧠'):
-            # Panggil fungsi utama kita
-            resep_final = generate_recipe(bahan_user)
-        
-        # Tampilkan hasilnya
-        st.markdown("---")
-        st.header("✅ Hasil Resep Rekomendasi:")
-        st.markdown(resep_final)
-        st.markdown("---")
-        st.success("Selamat mencoba, Bro! Jangan lupa bagi-bagi masakannya.")
-        
-        # === LOGIKA INTERAKTIF BARU ===
-        st.write("Belum sreg sama resepnya?")
-        
-        # Tombol untuk meminta resep baru
-        if st.button("Minta Ide Resep Lain"):
-            # Kita set 'rerun' ke True dan jalankan ulang
-            st.session_state['rerun'] = True 
-            st.rerun() # Perintah Streamlit untuk menjalankan ulang script
-            
-    else:
-        st.warning("Jangan kosong, Bro! Isi dulu bahannya!")
+# Tampilkan semua riwayat chat yang sudah disimpan
+for message in st.session_state.messages:
+    with st.chat_message(message["role"]):
+        st.markdown(message
